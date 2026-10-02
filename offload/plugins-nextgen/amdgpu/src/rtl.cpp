@@ -48,6 +48,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
 
 #if !defined(__BYTE_ORDER__) || !defined(__ORDER_LITTLE_ENDIAN__) ||           \
@@ -94,6 +95,14 @@ struct AMDGPUEventManagerTy;
 struct AMDGPUDeviceImageTy;
 struct AMDGPUMemoryManagerTy;
 struct AMDGPUMemoryPoolTy;
+
+/// Whether the HSA headers declare at least version \p Major.\p Minor of the
+/// AMD extension. See hsa_utils::getAMDExtensionVersion() for the version that
+/// the HSA runtime implements.
+#define AMDGPU_HSA_EXT_AT_LEAST(Major, Minor)                                  \
+  (HSA_AMD_INTERFACE_VERSION_MAJOR > (Major) ||                                \
+   (HSA_AMD_INTERFACE_VERSION_MAJOR == (Major) &&                              \
+    HSA_AMD_INTERFACE_VERSION_MINOR >= (Minor)))
 
 namespace hsa_utils {
 
@@ -172,8 +181,7 @@ static Error asyncMemCopy(bool UseMultipleSdmaEngines, void *Dst,
   }
 
 // This solution is probably not the best
-#if !(HSA_AMD_INTERFACE_VERSION_MAJOR >= 1 &&                                  \
-      HSA_AMD_INTERFACE_VERSION_MINOR >= 2)
+#if !AMDGPU_HSA_EXT_AT_LEAST(1, 2)
   return Plugin::error(ErrorCode::UNSUPPORTED,
                        "async copy on selected SDMA requires ROCm 5.7");
 #else
@@ -231,6 +239,18 @@ static Error getTargetTripleAndFeatures(hsa_agent_t Agent,
     return HSA_STATUS_SUCCESS;
   });
   return Err;
+}
+
+/// Get the version of the AMD extension that the HSA runtime implements, if the
+/// runtime reports it.
+static std::optional<llvm::VersionTuple> getAMDExtensionVersion() {
+  uint16_t Major, Minor;
+  if (hsa_system_get_info(HSA_AMD_SYSTEM_INFO_EXT_VERSION_MAJOR, &Major) !=
+          HSA_STATUS_SUCCESS ||
+      hsa_system_get_info(HSA_AMD_SYSTEM_INFO_EXT_VERSION_MINOR, &Minor) !=
+          HSA_STATUS_SUCCESS)
+    return std::nullopt;
+  return llvm::VersionTuple(Major, Minor);
 }
 } // namespace hsa_utils
 
@@ -3241,6 +3261,8 @@ struct AMDGPUDeviceTy : public GenericDeviceTy, AMDGenericDeviceTy {
       Info.add("HSA Runtime Version",
                std::to_string(Major) + "." + std::to_string(Minor), "",
                DeviceInfo::DRIVER_VERSION);
+    if (auto Version = hsa_utils::getAMDExtensionVersion())
+      Info.add("HSA AMD Extension Version", Version->getAsString());
 
     Info.add("HSA OpenMP Device Number", DeviceId);
 
