@@ -847,7 +847,7 @@ void ForkBefore(ThreadState* thr, uptr pc) SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
   ScopedErrorReportLock::Lock();
   AllocatorLockBeforeFork();
   // Suppress all reports in the pthread_atfork callbacks.
-  // Reports will deadlock on ScopedErrorReportLock.
+  // Reports may deadlock.
   // We could ignore sync operations as well,
   // but so far it's unclear if it will do more good or harm.
   // Unnecessarily ignoring things can lead to false positives later.
