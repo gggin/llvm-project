@@ -9,8 +9,10 @@
 
 This version matches Zig 0.15.2's LLVM major version and release profile.
 Linux x86_64, Windows x86_64 and macOS x86_64/arm64 all build the same owned
-LLVM/Clang/LLD source. GPI uses LLVM code generation, Clang C imports and LLD
-native linking on each platform. Application and snippet sources remain Zig.
+LLVM/Clang/LLD source. GPI uses LLVM code generation and Clang C imports on each platform. Native
+linking uses LLD on Linux/Windows and Zig's Mach-O linker on macOS, because
+Zig 0.15.2 does not support LLD for Mach-O. Application and snippet sources
+remain Zig.
 
 The integration builds X86 on x86_64 hosts and AArch64 on Apple Silicon,
 including the required Clang/LLD libraries, with tests, examples and benchmarks
